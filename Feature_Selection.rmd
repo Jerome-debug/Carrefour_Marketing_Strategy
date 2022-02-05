@@ -1,0 +1,241 @@
+---
+title: "Feature_selection"
+author: "Bundi Kirimi"
+date: "2/5/2022"
+output: html_document
+---
+
+
+#Feature Selection
+http://bit.ly/CarreFourDataset
+
+
+
+
+
+
+#Loading the data
+```{r}
+
+
+library(readr)
+df <- read.csv("Supermarket_Dataset_1 - Sales Data.csv",sep = ",", dec = ".")
+
+head(df)
+```
+
+
+#Previewing the summary of the dataset
+```{r}
+summary(df)
+```
+
+#Checking the data
+```{r}
+#Length
+length(df)
+```
+The dataframe has 18 columns
+
+
+````{r}
+#Dimensions
+dim(df)
+
+````
+
+
+
+
+#The dataframe has 12330 row entries and 18 columns
+Column Names
+```{r}
+colnames(df)
+
+```
+
+Column data types
+
+```{r}
+sapply(df, class)
+```
+
+
+
+
+#Data Cleaning
+
+```{r}
+
+any(is.na(df))
+```
+
+NO NULL VALUES IN OUR DATA
+
+#Data Types
+```{r}
+
+sapply(df, class)
+```
+Checking the categories in categorical columns
+```{r}
+unique(df$Branch)
+
+unique(df$Customer.type)
+
+unique(df$Gender)
+
+unique(df$Product.line )
+unique(df$Payment)
+
+unique(df$ Rating)
+
+
+```
+
+```{r}
+# Convert data types using as.integer
+# Branch
+# Convert data types using as.integer
+# Branch
+df$Branch_E<-as.integer(as.factor(df$Branch))
+# Customer Type
+df$Customer_Type_E<-as.integer(as.factor(df$Customer.type))
+# Gender
+df$Gender_E<-as.integer(as.factor(df$Gender))
+# Product.line
+df$Product_Line_E<-as.integer(as.factor(df$Product.line))
+#Payment
+df$Payment_E<-as.integer(as.factor(df$Payment))
+```
+
+Splitting Date_Time
+```{r}
+library("lubridate")
+```
+
+
+
+```{r}
+library("ymd")
+
+# Split date year, month and day.
+# Convert to date datatype first then split thereafter
+df$Date <- as.Date(df$Date, "%m/%d/%Y")
+df$year <- year(ymd(df$Date))
+df$month <- month(ymd(df$Date))
+df$day <- day(ymd(df$Date))
+df$hour = format(strptime(df$Time,"%H:%M"),'%H')
+df$minute = format(strptime(df$Time,"%H:%M"),'%M')
+```
+
+```{r}
+#install.packages(dplyr)
+library(dplyr)
+```
+
+```{r}
+df_sales_num <- select_if(df,is.numeric)
+str(df_sales_num)
+```
+
+
+
+
+
+
+Identifying colums variance
+
+A variance of zero indicates that all of the data values are identical. All non-zero variances are positive. A small variance indicates that the data points tend to be very close to the mean, and to each other.
+We will drop the colum with zero variance as its not necessarry in our analysis because all the values are identical
+```{r}
+
+# Identify the columns with zero column variance.
+names(df_sales_num[, sapply(df_sales_num, function(v) var(v,
+na.rm=TRUE)==0)])
+
+
+```
+```{r}
+# Drop the columns as they have a variance of 0"
+df_sales_num <- subset(df_sales_num, select = -c(gross.margin.percentage,
+year))
+```
+
+
+```{r}
+dim(df_sales_num)
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Installing and loading our caret package
+# ---
+# 
+suppressWarnings(
+        suppressMessages(if
+                         (!require(caret, quietly=TRUE))
+                install.packages("caret")))
+library(caret)
+
+```
+
+
+```{R}
+# Installing and loading the corrplot package for plotting
+# ---
+# 
+suppressWarnings(
+        suppressMessages(if
+                         (!require(corrplot, quietly=TRUE))
+                install.packages("corrplot")))
+library(corrplot)
+
+```
+
+````{R}
+# Calculating the correlation matrix
+correlationMatrix <- cor(df_sales_num)
+
+# Find attributes that are highly correlated
+# ---
+#
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=0.75)
+
+# Highly correlated attributes
+# ---
+# 
+highlyCorrelated
+
+names(df_sales_num[,highlyCorrelated])
+
+````
+
+
+
+```{R}
+# We can remove the variables with a higher correlation 
+# and comparing the results graphically as shown below
+# ---
+# 
+# Removing Redundant Features 
+# ---
+# 
+Dataset2<-df_sales_num[-highlyCorrelated]
+
+# Performing our graphical comparison
+# ---
+# 
+par(mfrow = c(1, 2))
+corrplot(correlationMatrix, order = "hclust")
+corrplot(cor(Dataset2), order = "hclust")
+
+```

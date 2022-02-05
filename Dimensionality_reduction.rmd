@@ -1,0 +1,364 @@
+---
+title: "Dimensionality Reduction and Feature Selection"
+author: "Bundi Kirimi"
+date: "2/4/2022"
+output: html_document
+---
+
+
+#Installing packages.
+```{r}
+#install.packages("devtools")
+
+#install_github("vqv/ggbiplot")
+#install.packages("rtools")
+#install.packages("DataExplorer") 
+#install.packages("Hmisc")
+#install.packages("pastecs")
+#install.packages("psych")
+#install.packages("corrplot")
+#install.packages("factoextra")
+#install.packages("caret")
+```
+
+#Loading the libraries
+````{r}
+#specify the path where the file is located
+library("data.table")
+library(tidyverse)
+library(magrittr)
+library(warn = -1)
+library("ggbiplot")
+library(ggplot2)
+library(lattice)
+library(corrplot)
+library(DataExplorer)
+library(pastecs)
+library(psych)
+library(factoextra)
+library(caret)
+
+````
+
+```{r}
+library(data.table)
+```
+
+```{r}
+getwd()
+```
+
+#Loading the data
+```{r}
+
+
+library(readr)
+df <- read.csv("Supermarket_Dataset_1 - Sales Data.csv",sep = ",", dec = ".")
+
+df
+```
+
+
+#Previewing the summary of the dataset
+```{r}
+summary(df)
+```
+
+#Checking the data
+```{r}
+#Length
+length(df)
+```
+The dataframe has 18 columns
+
+
+````{r}
+#Dimensions
+dim(df)
+
+````
+
+
+
+
+#The dataframe has 12330 row entries and 18 columns
+Column Names
+```{r}
+colnames(df)
+
+```
+
+Column data types
+
+```{r}
+sapply(df, class)
+```
+
+
+
+
+#Data Cleaning
+
+```{r}
+
+any(is.na(df))
+```
+
+NO NULL VALUES IN OUR DATA
+
+#Data Types
+```{r}
+
+sapply(df, class)
+```
+Checking the categories in categorical columns
+```{r}
+unique(df$Branch)
+
+unique(df$Customer.type)
+
+unique(df$Gender)
+
+unique(df$Product.line )
+unique(df$Payment)
+
+unique(df$ Rating)
+
+
+```
+
+```{r}
+# Convert data types using as.integer
+# Branch
+# Convert data types using as.integer
+# Branch
+df$Branch_E<-as.integer(as.factor(df$Branch))
+# Customer Type
+df$Customer_Type_E<-as.integer(as.factor(df$Customer.type))
+# Gender
+df$Gender_E<-as.integer(as.factor(df$Gender))
+# Product.line
+df$Product_Line_E<-as.integer(as.factor(df$Product.line))
+#Payment
+df$Payment_E<-as.integer(as.factor(df$Payment))
+```
+
+Splitting Date_Time
+```{r}
+library("lubridate")
+```
+
+
+
+```{r}
+library("ymd")
+
+# Split date year, month and day.
+# Convert to date datatype first then split thereafter
+df$Date <- as.Date(df$Date, "%m/%d/%Y")
+df$year <- year(ymd(df$Date))
+df$month <- month(ymd(df$Date))
+df$day <- day(ymd(df$Date))
+df$hour = format(strptime(df$Time,"%H:%M"),'%H')
+df$minute = format(strptime(df$Time,"%H:%M"),'%M')
+```
+
+```{r}
+#install.packages(dplyr)
+library(dplyr)
+```
+
+```{r}
+df_sales_num <- select_if(df,is.numeric)
+str(df_sales_num)
+```
+
+
+Identifying colums variance
+
+A variance of zero indicates that all of the data values are identical. All non-zero variances are positive. A small variance indicates that the data points tend to be very close to the mean, and to each other.
+We will drop the colum with zero variance as its not necessarry in our analysis because all the values are identical
+```{r}
+
+# Identify the columns with zero column variance.
+names(df_sales_num[, sapply(df_sales_num, function(v) var(v,
+na.rm=TRUE)==0)])
+
+
+```
+```{r}
+# Drop the columns as they have a variance of 0"
+df_sales_num <- subset(df_sales_num, select = -c(gross.margin.percentage,
+year))
+```
+
+
+```{r}
+dim(df_sales_num)
+```
+```{r}
+standard_sales <- as.data.frame(scale(df_sales_num[1:14])) # standardise the variables
+standard_sales.pca <- prcomp(standard_sales)    
+```
+
+```{r}
+summary(standard_sales.pca)
+```
+This gives us the standard deviation of each component, and the proportion of variance explained by each component.
+```{r}
+standard_sales.pca$sdev
+```
+The total variance explained by the components is the sum of the variances of the components:
+```{r}
+sum((standard_sales.pca$sdev)^2)
+```
+
+
+In this case, we see that the total variance is 14, which is equal to the number of standardised variables (14 variables). This is because for standardised data, the variance of each standardised variable is 1. The total variance is equal to the sum of the variances of the individual variables, and since the variance of each standardised variable is 1, the total variance should be equal to the number of variables (14 here)
+
+
+#Deciding How Many Principal Components to Retain
+```{r}
+screeplot(standard_sales.pca, type="lines")
+```
+
+The most obvious change in slope in the scree plot occurs at component 5, which is the “elbow” of the scree plot. Therefore, it could be argued based on the basis of the scree plot that the first five components should be retained.
+
+#Loadings for the Principal Components
+
+```{r}
+standard_sales.pca$rotation[,1]
+```
+
+
+
+calculate the values of the first principal component
+```{r}
+calcpc <- function(variables,loadings)
+{
+  # find the number of samples in the data set
+  as.data.frame(variables)
+  numsamples <- nrow(variables)
+  # make a vector to store the component
+  pc <- numeric(numsamples)
+  # find the number of variables
+  numvariables <- length(variables)
+  # calculate the value of the component for each sample
+  for (i in 1:numsamples)
+  {
+    valuei <- 0
+    for (j in 1:numvariables)
+    {
+      valueij <- variables[i,j]
+      loadingj <- loadings[j]
+      valuei <- valuei + (valueij * loadingj)
+    }
+    pc[i] <- valuei
+  }
+  return(pc)
+}
+```
+
+
+```{r}
+calcpc(standard_sales, standard_sales.pca$rotation[,1])
+```
+```{r}
+library(ggbiplot)
+```
+
+```{r}
+ggbiplot(standard_sales.pca)
+
+```
+
+```{r}
+ggbiplot(standard_sales.pca, labels=rownames(standard_sales), obs.scale = 1, var.scale = 1)
+```
+
+```{r}
+#install.packages("Rtsne")
+library(Rtsne)
+tsne <- Rtsne(standard_sales, dims = 2, perplexity=30, verbose=TRUE, max_iter =
+500)
+
+```
+```{r}
+standard_sales$Rating_num = as.integer(standard_sales$Rating)
+```
+'
+
+
+```{R}
+# Loading our tnse library
+# 
+library(Rtsne)
+
+
+```
+
+
+```{r}
+#Preparing the database for analysis
+Labels<-standard_sales$Rating_num
+standard_sales$Rating_num<-as.factor(standard_sales$Rating_num)
+# For plotting
+colors = rainbow(length(standard_sales$Rating_num))
+names(colors) = unique(standard_sales$Rating_num)
+plot(tsne$Y, t='n', main="tsne")
+text(tsne$Y, labels=standard_sales$Rating_num,
+col=colors[standard_sales$Rating_num])
+```
+
+```{R}
+# Curating the database for analysis 
+# 
+Labels<-standard_sales$Rating_num
+standard_sales$Rating_num<-as.factor(standard_sales$Rating_num)
+````
+
+```{r}
+# For plotting
+#
+colors = rainbow(length(unique(standard_sales$Rating_num)))
+names(colors) = unique(standard_sales$Rating_num)
+names(colors)
+
+
+```
+```{r}
+duplicated(standard_sales)
+```
+
+```{R}
+# Executing the algorithm on curated data
+# 
+tsne <- Rtsne(standard_sales[], dims = 2, perplexity=30, verbose=TRUE, max_iter = 500)
+
+# Getting the duration of execution
+# 
+exeTimeTsne <- system.time(Rtsne(standard_sales[,-1], dims = 2, perplexity=30, verbose=TRUE, max_iter = 500))
+
+
+```
+
+
+```{R}
+# Plotting our graph and closely examining the graph
+# 
+plot(tsne$Y, t='n', main="tsne")
+text(tsne$Y, labels=standard_sales$Rating_num, col=colors[standard_sales$Rating_num])
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
